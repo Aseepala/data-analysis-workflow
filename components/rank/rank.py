@@ -4,7 +4,6 @@ import json
 import logging
 from typing import List, Dict
 import pandas as pd
-import mlflow
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -88,11 +87,11 @@ def main():
             f"{issue['issue_theme'][:80]}"
         )
 
-    # Log metrics to MLflow
-    mlflow.log_metric("total_issues", int(df.shape[0]))
-    mlflow.log_metric("total_clusters", int(df["cluster_id"].nunique()))
+    # Log metrics to AML run via print (picked up by AML logging agent)
+    logger.info(f"total_issues={int(df.shape[0])}")
+    logger.info(f"total_clusters={int(df['cluster_id'].nunique())}")
     for issue in top_issues:
-        mlflow.log_metric(f"rank_{issue['rank']}_count", issue["count"])
+        logger.info(f"rank_{issue['rank']}_count={issue['count']}")
 
     # Save outputs
     os.makedirs(args.final_report, exist_ok=True)
@@ -106,9 +105,6 @@ def main():
     with open(md_path, "w") as f:
         f.write(generate_markdown(top_issues, args.top_n))
     logger.info(f"Markdown report saved to: {md_path}")
-
-    mlflow.log_artifact(json_path)
-    mlflow.log_artifact(md_path)
 
 
 if __name__ == "__main__":
