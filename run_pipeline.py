@@ -1,6 +1,7 @@
 # --- Imports ---
 from azure.identity import InteractiveBrowserCredential
-from azure.ai.ml import MLClient, dsl, Input, load_component
+from azure.ai.ml import MLClient, dsl, Input, Output, load_component
+from azure.ai.ml.constants import AssetTypes
 from config import ENVIRONMENT, PIPELINE
 
 # --- Global component variables ---
@@ -81,6 +82,12 @@ def main():
         text_column=pipeline_cfg["text_column"],
         top_n=pipeline_cfg["top_n"],
         compute_name=config["compute_name"],
+    )
+
+    # Route the final CSV output to heron_sandbox_storage
+    pipeline.outputs.final_report = Output(
+        type=AssetTypes.URI_FOLDER,
+        path=f"azureml://datastores/heron_sandbox_storage/paths/{pipeline_cfg['output_path']}",
     )
 
     pipeline_job = ml_client.jobs.create_or_update(

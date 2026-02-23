@@ -15,4 +15,5 @@ PIPELINE = {
     "input_data": "test_data/issues.csv",  # local sample data (swap for azureml:issues-dataset@latest to use a registered dataset)
     "text_column": "description",
     "top_n": 10,
+    "output_path": "top-issues-results/",  # path within heron_sandbox_storage datastore
 }

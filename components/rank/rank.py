@@ -1,6 +1,5 @@
 import argparse
 import os
-import json
 import logging
 from typing import List, Dict
 import pandas as pd
@@ -55,22 +54,6 @@ def build_top_issues(df: pd.DataFrame, top_n: int) -> List[Dict]:
     return top_issues
 
 
-def generate_markdown(top_issues: List[Dict], top_n: int) -> str:
-    lines = [
-        f"# Top {top_n} Issues Report\n",
-        f"**Total issues analysed:** {sum(i['count'] for i in top_issues)}\n",
-        "---\n",
-    ]
-    for issue in top_issues:
-        lines.append(f"## #{issue['rank']} — {issue['issue_theme']}")
-        lines.append(f"- **Count:** {issue['count']} issues ({issue['percentage']}% of total)")
-        lines.append("- **Examples:**")
-        for ex in issue["example_issues"]:
-            lines.append(f"  - _{ex}_")
-        lines.append("")
-    return "\n".join(lines)
-
-
 def main():
     args = parse_args()
 
@@ -96,15 +79,21 @@ def main():
     # Save outputs
     os.makedirs(args.final_report, exist_ok=True)
 
-    json_path = os.path.join(args.final_report, "top_issues.json")
-    with open(json_path, "w") as f:
-        json.dump({"top_issues": top_issues}, f, indent=2)
-    logger.info(f"JSON report saved to: {json_path}")
+    # Build flat CSV - one row per ranked issue cluster
+    report_rows = []
+    for issue in top_issues:
+        report_rows.append({
+            "rank":           issue["rank"],
+            "issue_theme":    issue["issue_theme"],
+            "count":          issue["count"],
+            "percentage":     issue["percentage"],
+            "example_issues": "; ".join(issue["example_issues"]),
+        })
 
-    md_path = os.path.join(args.final_report, "top_issues_report.md")
-    with open(md_path, "w") as f:
-        f.write(generate_markdown(top_issues, args.top_n))
-    logger.info(f"Markdown report saved to: {md_path}")
+    report_df = pd.DataFrame(report_rows)
+    csv_path = os.path.join(args.final_report, "top_issues.csv")
+    report_df.to_csv(csv_path, index=False)
+    logger.info(f"Top issues dataset saved to: {csv_path}")
 
 
 if __name__ == "__main__":
