@@ -1,0 +1,36 @@
+$schema: https://azuremlschemas.azureedge.net/latest/commandComponent.schema.json
+type: command
+
+name: rank_issues
+display_name: Issue Ranking & Report Generation
+description: >
+  Ranks issue clusters by frequency and severity, then generates
+  a structured top-N issues report in JSON and Markdown format.
+
+version: "1.0"
+
+inputs:
+  clustered_issues:
+    type: uri_folder
+    description: Clustered issues folder
+  top_n:
+    type: integer
+    description: Number of top issues to include in the report
+    default: 10
+
+outputs:
+  final_report:
+    type: uri_folder
+    description: Top issues report in JSON and Markdown formats
+
+environment:
+  conda_file: ../env/conda.yml
+  image: mcr.microsoft.com/azureml/openmpi4.1.0-ubuntu20.04
+
+code: .
+
+command: >-
+  python rank.py
+  --clustered_issues ${{inputs.clustered_issues}}
+  --top_n ${{inputs.top_n}}
+  --final_report ${{outputs.final_report}}

@@ -1,0 +1,34 @@
+$schema: https://azuremlschemas.azureedge.net/latest/commandComponent.schema.json
+type: command
+
+name: ingest_data
+display_name: Data Ingestion & Validation
+description: Loads raw CSV data, validates schema, checks the text column exists, and removes empty rows.
+
+version: "1.0"
+
+inputs:
+  raw_data:
+    type: uri_file
+    description: Raw input CSV file
+  text_column:
+    type: string
+    description: Column name containing issue/feedback text
+    default: "description"
+
+outputs:
+  validated_data:
+    type: uri_folder
+    description: Cleaned and validated data ready for issue extraction
+
+environment:
+  conda_file: ../env/conda.yml
+  image: mcr.microsoft.com/azureml/openmpi4.1.0-ubuntu20.04
+
+code: .
+
+command: >-
+  python ingest.py
+  --raw_data ${{inputs.raw_data}}
+  --text_column ${{inputs.text_column}}
+  --validated_data ${{outputs.validated_data}}

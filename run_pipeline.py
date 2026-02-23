@@ -1,0 +1,95 @@
+# --- Imports ---
+from azure.identity import InteractiveBrowserCredential
+from azure.ai.ml import MLClient, dsl, Input, load_component
+from config import ENVIRONMENT, PIPELINE
+
+# --- Global component variables ---
+# Populated in main() before the pipeline function is called.
+ingest_data = None
+extract_issues = None
+cluster_issues = None
+rank_issues = None
+
+
+# --- Pipeline definition ---
+@dsl.pipeline(
+    name="top_issues_analysis_pipeline",
+    description="Analyses M365 Copilot issues using an SLM to extract, cluster and rank the top issues",
+    default_datastore="workspaceblobstore"
+)
+def top_issues_pipeline(
+    raw_data: Input,
+    text_column: str,
+    top_n: int,
+    compute_name: str,
+):
+    # --- Step 1: Ingest & validate raw data ---
+    ingest_step = ingest_data(
+        raw_data=raw_data,
+        text_column=text_column,
+    )
+    ingest_step.compute = compute_name
+
+    # --- Step 2: Extract issue summaries using SLM ---
+    extract_step = extract_issues(
+        validated_data=ingest_step.outputs.validated_data,
+        text_column=text_column,
+    )
+    extract_step.compute = compute_name
+
+    # --- Step 3: Cluster similar issues together ---
+    cluster_step = cluster_issues(
+        extracted_issues=extract_step.outputs.extracted_issues,
+    )
+    cluster_step.compute = compute_name
+
+    # --- Step 4: Rank and generate top issues report ---
+    rank_step = rank_issues(
+        clustered_issues=cluster_step.outputs.clustered_issues,
+        top_n=top_n,
+    )
+    rank_step.compute = compute_name
+
+    return rank_step.outputs
+
+
+def main():
+    global ingest_data, extract_issues, cluster_issues, rank_issues
+
+    # --- Load configuration ---
+    config = ENVIRONMENT
+    pipeline_cfg = PIPELINE
+
+    # --- Authenticate and create Azure ML client ---
+    cred = InteractiveBrowserCredential(tenant_id=config["tenant_id"])
+    ml_client = MLClient(
+        cred,
+        config["azure_subscription_id"],
+        config["azure_resource_group"],
+        config["azure_ml_account"]
+    )
+
+    # --- Load components from local YAML specs ---
+    ingest_data    = load_component(source="components/ingest/component.yml")
+    extract_issues = load_component(source="components/extract/component.yml")
+    cluster_issues = load_component(source="components/cluster/component.yml")
+    rank_issues    = load_component(source="components/rank/component.yml")
+
+    # --- Build and submit the pipeline job ---
+    pipeline = top_issues_pipeline(
+        raw_data=Input(type="uri_file", path=pipeline_cfg["input_data"]),
+        text_column=pipeline_cfg["text_column"],
+        top_n=pipeline_cfg["top_n"],
+        compute_name=config["compute_name"],
+    )
+
+    pipeline_job = ml_client.jobs.create_or_update(
+        pipeline,
+        experiment_name=pipeline_cfg["experiment_name"]
+    )
+
+    print("Pipeline submitted! Track at:", pipeline_job.studio_url)
+
+
+if __name__ == "__main__":
+    main()

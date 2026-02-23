@@ -1,0 +1,36 @@
+$schema: https://azuremlschemas.azureedge.net/latest/commandComponent.schema.json
+type: command
+
+name: extract_issues
+display_name: Issue Extraction via SLM
+description: >
+  Uses a Small Language Model (Phi-3-mini via Ollama or HuggingFace) to read
+  each row's text and extract a concise one-line issue summary.
+
+version: "1.0"
+
+inputs:
+  validated_data:
+    type: uri_folder
+    description: Validated input data folder
+  text_column:
+    type: string
+    description: Column name containing issue/feedback text
+    default: "description"
+
+outputs:
+  extracted_issues:
+    type: uri_folder
+    description: Data with an added 'issue_summary' column from the SLM
+
+environment:
+  conda_file: ../env/conda.yml
+  image: mcr.microsoft.com/azureml/openmpi4.1.0-ubuntu20.04
+
+code: .
+
+command: >-
+  python extract.py
+  --validated_data ${{inputs.validated_data}}
+  --text_column ${{inputs.text_column}}
+  --extracted_issues ${{outputs.extracted_issues}}

@@ -1,0 +1,31 @@
+$schema: https://azuremlschemas.azureedge.net/latest/commandComponent.schema.json
+type: command
+
+name: cluster_issues
+display_name: Issue Clustering
+description: >
+  Embeds issue summaries using sentence-transformers and clusters them
+  with K-Means to group similar issues together.
+
+version: "1.0"
+
+inputs:
+  extracted_issues:
+    type: uri_folder
+    description: Folder containing extracted issue summaries
+
+outputs:
+  clustered_issues:
+    type: uri_folder
+    description: Data with cluster labels and cluster topic labels assigned
+
+environment:
+  conda_file: ../env/conda.yml
+  image: mcr.microsoft.com/azureml/openmpi4.1.0-ubuntu20.04
+
+code: .
+
+command: >-
+  python cluster.py
+  --extracted_issues ${{inputs.extracted_issues}}
+  --clustered_issues ${{outputs.clustered_issues}}
