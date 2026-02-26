@@ -1,0 +1,16 @@
+name: top-issues-env
+channels:
+  - defaults
+  - conda-forge
+dependencies:
+  - python=3.9
+  - pip
+  - pip:
+    - pandas
+    - numpy
+    - scikit-learn
+    - transformers
+    - torch
+    - sentence-transformers
+    - accelerate
+    - joblib

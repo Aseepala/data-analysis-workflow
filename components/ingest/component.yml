@@ -22,7 +22,7 @@ outputs:
     description: Cleaned and validated data ready for issue extraction
 
 environment:
-  conda_file: ../env/conda.yml
+  conda_file: ../../environments/conda.yml
   image: mcr.microsoft.com/azureml/openmpi4.1.0-ubuntu20.04
 
 code: .
