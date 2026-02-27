@@ -1,6 +1,8 @@
 # M365 Copilot Top Issues Analysis Pipeline
 
-This project runs an Azure ML pipeline to analyse M365 Copilot user feedback and surface the top issues, leveraging a Small Language Model (SLM) to extract, cluster, and rank issues from raw input data.
+This project runs an Azure ML pipeline to identify the top recurring issues from M365 Copilot user feedback. It uses a transformer-based summarization model (BART) to extract concise issue summaries, K-Means clustering to group similar issues, and frequency ranking to surface what matters most — replacing slow manual analysis with an automated, scalable pipeline.
+
+> 📓 **Want to explore interactively?** Open [`notebook/Data-analysis.ipynb`](notebook/Data-analysis.ipynb) to run a lightweight data exploration of the dataset locally — no Azure ML needed. It covers data loading, product area breakdowns, source distribution, trends over time, and a heatmap cross-analysis.
 
 ---
 
@@ -8,32 +10,34 @@ This project runs an Azure ML pipeline to analyse M365 Copilot user feedback and
 
 ```
 data-analysis/
-├── run_pipeline.py             # Main pipeline script
+├── run_pipeline.py             # Main pipeline script — submits the AML job
 ├── config.py                   # Environment and pipeline configuration
 ├── test_data/
-│   └── issues.csv              # Sample M365 Copilot issues data
+│   └── issues.csv              # Synthetic M365 Copilot issues dataset (40 rows)
+├── notebook/
+│   └── Data-analysis.ipynb     # Interactive data exploration notebook (local, no AML)
+├── environments/
+│   └── conda.yml               # Shared conda environment for all pipeline components
 └── components/
-    ├── env/
-    │   └── conda.yml           # Shared conda environment for all steps
     ├── ingest/
     │   ├── component.yml
     │   └── ingest.py           # Data ingestion & validation
     ├── extract/
     │   ├── component.yml
-    │   └── extract.py          # Issue extraction via SLM
+    │   └── extract.py          # Issue summarisation via BART (swap for Phi on GPU)
     ├── cluster/
     │   ├── component.yml
-    │   └── cluster.py          # Issue clustering via sentence embeddings
+    │   └── cluster.py          # Issue clustering via sentence embeddings + K-Means
     └── rank/
         ├── component.yml
-        └── rank.py             # Issue ranking & report generation
+        └── rank.py             # Issue ranking & CSV report generation
 ```
 
 ---
 
 ## Prerequisites
 
-- Python 3.8+
+- Python 3.9+
 - Install required packages: `pip install azure-ai-ml azure-identity`
 - Any Heron environment with an AML workspace provisioned
 
@@ -41,7 +45,7 @@ data-analysis/
 
 ## Configuration
 
-All environment and pipeline settings are in `config.py`. Update these values to match your Azure resources before running. All of these configuration values can be found on the Heron environment's AML card in AI Foundry.
+All environment and pipeline settings are in `config.py`. Update these values to match your Azure resources before running. All configuration values can be found on the Heron environment's AML card in AI Foundry.
 
 ```python
 ENVIRONMENT = {
@@ -53,11 +57,11 @@ ENVIRONMENT = {
 }
 
 PIPELINE = {
-    "pipeline_yml": "pipeline.yml",
     "experiment_name": "top-issues-analysis",
     "input_data": "test_data/issues.csv",  # local path or azureml:dataset@latest
     "text_column": "description",          # column containing issue text
-    "top_n": 10,                           # number of top issues to report
+    "top_n": 10,                           # number of top issues to surface
+    "output_path": "top-issues-results/",  # path within heron_sandbox_storage
 }
 ```
 
@@ -101,51 +105,30 @@ Pipeline submitted! Track at: https://ml.azure.com/runs/...
 
 ## Pipeline Steps
 
-The pipeline runs the following steps in order:
+The pipeline runs 4 steps in sequence:
 
-1. **Data Ingestion & Validation** (`ingest.py`) — Loads the CSV, checks the text column exists, drops empty and duplicate rows, and outputs a clean validated dataset
-2. **Issue Extraction via SLM** (`extract.py`) — Passes each issue through a Small Language Model (`facebook/bart-large-cnn`) to produce a concise one-line issue summary
-3. **Issue Clustering** (`cluster.py`) — Embeds all summaries using `sentence-transformers` (`all-MiniLM-L6-v2`), auto-selects the optimal number of clusters via silhouette score, and groups similar issues using K-Means
-4. **Issue Ranking & Report Generation** (`rank.py`) — Sorts clusters by frequency, picks the top N, and outputs a structured report in JSON and Markdown format
+1. **Ingest** (`ingest.py`) — Loads the CSV, validates the text column exists, drops empty and duplicate rows, and outputs a clean dataset
+2. **Extract** (`extract.py`) — Summarises each issue into one concise sentence using `facebook/bart-large-cnn` (a CPU-friendly summarization model; swap for `microsoft/phi-2` on GPU compute for a true SLM)
+3. **Cluster** (`cluster.py`) — Embeds all summaries using `all-MiniLM-L6-v2`, auto-selects the optimal number of clusters via silhouette score, and groups similar issues using K-Means
+4. **Rank** (`rank.py`) — Sorts clusters by frequency, picks the top N, and saves a structured CSV report
+
+**How it flows:**
+
+> Raw CSV → *(clean & validate)* → *(summarise)* → *(embed & cluster)* → *(rank by frequency)* → **Top issues CSV**
 
 ---
 
 ## Output
 
-On completion, the pipeline writes the following files to the `final_report` output folder:
+On completion, the pipeline writes the following file to `heron_sandbox_storage`:
 
-### `top_issues.json`
-A structured JSON file listing the top N issues:
-```json
-{
-  "top_issues": [
-    {
-      "rank": 1,
-      "cluster_id": 3,
-      "issue_theme": "Copilot meeting summaries missing action items",
-      "count": 8,
-      "percentage": 20.0,
-      "example_issues": [
-        "Meeting recap generated by Copilot attributes quotes to the wrong speakers",
-        "Teams Copilot transcript is in English but the meeting was in Spanish"
-      ]
-    }
-  ]
-}
+### `top_issues.csv`
+A ranked CSV report — one row per issue cluster:
+
+```csv
+rank,issue_theme,count,percentage,example_issues
+1,"Copilot meeting summaries missing action items",8,20.0,"Meeting recap attributes quotes to wrong speakers; ..."
+2,...
 ```
 
-### `top_issues_report.md`
-A human-readable Markdown report of the top issues, suitable for sharing with stakeholders:
-
-```markdown
-# Top 10 Issues Report
-
-**Total issues analysed:** 40
-
----
-
-## #1 — Copilot meeting summaries missing action items
-- **Count:** 8 issues (20.0% of total)
-- **Examples:**
-  - _Meeting recap generated by Copilot attributes quotes to the wrong speakers_
-```
+The output path is configured in `config.py` under `PIPELINE["output_path"]`.
