@@ -2,7 +2,7 @@
 
 This project runs an Azure ML pipeline to identify the top recurring issues from M365 Copilot user feedback. It uses a transformer-based summarization model (BART) to extract concise issue summaries, K-Means clustering to group similar issues, and frequency ranking to surface what matters most — replacing slow manual analysis with an automated, scalable pipeline.
 
-> 📓 **Want to explore interactively?** Open [`notebook/Data-analysis.ipynb`](notebook/Data-analysis.ipynb) to run a lightweight data exploration of the dataset locally — no Azure ML needed. It covers data loading, product area breakdowns, source distribution, trends over time, and a heatmap cross-analysis.
+> 📓 **Want to explore interactively?** Open [`notebook/Data-analysis.ipynb`](notebook/Data-analysis.ipynb) to run a lightweight data exploration of the dataset on AzureML Notebooks. It covers data loading, product area breakdowns, source distribution, trends over time, and a heatmap cross-analysis.
 
 ---
 
