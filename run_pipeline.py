@@ -15,16 +15,19 @@ rank_issues = None
 
 
 # --- Pipeline definition ---
+# This function defines the pipeline DAG (directed acyclic graph).
+# It does NOT execute anything — it just describes the steps and how
+# data flows between them. AML runs them later in the cloud.
 @dsl.pipeline(
     name="top_issues_analysis_pipeline",
     description="Analyses M365 Copilot issues using an SLM to extract, cluster and rank the top issues",
     default_datastore="heron_sandbox_storage"
 )
 def top_issues_pipeline(
-    raw_data: Input,
-    text_column: str,
-    top_n: int,
-    compute_name: str,
+    raw_data: Input,          # The input CSV file from the AML datastore
+    text_column: str,         # Column name containing raw issue text (e.g. "description")
+    top_n: int,               # How many top issues to include in the final report
+    compute_name: str,        # AML compute cluster to run each step on (e.g. "lin-cpu-00")
 ):
     # --- Step 1: Ingest & validate raw data ---
     ingest_step = ingest_data(
@@ -57,6 +60,8 @@ def top_issues_pipeline(
 
 
 def main():
+    # Pull the global component variables so we can assign them here
+    # and the pipeline function above can reference them when building the graph.
     global ingest_data, extract_issues, cluster_issues, rank_issues
 
     # --- Load configuration ---
@@ -73,12 +78,16 @@ def main():
     )
 
     # --- Load components from local YAML specs ---
+    # Each YAML file describes one step: what script to run, what conda
+    # environment to use, and what inputs/outputs it expects.
     ingest_data    = load_component(source="components/ingest/component.yml")
     extract_issues = load_component(source="components/extract/component.yml")
     cluster_issues = load_component(source="components/cluster/component.yml")
     rank_issues    = load_component(source="components/rank/component.yml")
 
-    # --- Build and submit the pipeline job ---
+    # --- Build the pipeline graph ---
+    # Calls top_issues_pipeline() with the actual config values to construct
+    # the pipeline object (the DAG of steps). Nothing runs yet.
     pipeline = top_issues_pipeline(
         raw_data=Input(type="uri_file", path=pipeline_cfg["input_data"]),
         text_column=pipeline_cfg["text_column"],
@@ -92,6 +101,9 @@ def main():
         path=f"azureml://datastores/heron_sandbox_storage/paths/{pipeline_cfg['output_path']}",
     )
 
+    # --- Submit the pipeline to AML ---
+    # This is the "go" button — sends the pipeline graph to Azure ML,
+    # which spins up compute and runs all 4 steps in the cloud.
     pipeline_job = ml_client.jobs.create_or_update(
         pipeline,
         experiment_name=pipeline_cfg["experiment_name"]
