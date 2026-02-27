@@ -1,4 +1,6 @@
 # --- Imports ---
+# Standard library and Azure SDK imports for file handling, authentication,
+# Azure ML pipeline orchestration, and project configuration.
 from azure.identity import InteractiveBrowserCredential
 from azure.ai.ml import MLClient, dsl, Input, Output, load_component
 from azure.ai.ml.constants import AssetTypes
@@ -16,7 +18,7 @@ rank_issues = None
 @dsl.pipeline(
     name="top_issues_analysis_pipeline",
     description="Analyses M365 Copilot issues using an SLM to extract, cluster and rank the top issues",
-    default_datastore="workspaceblobstore"
+    default_datastore="heron_sandbox_storage"
 )
 def top_issues_pipeline(
     raw_data: Input,
